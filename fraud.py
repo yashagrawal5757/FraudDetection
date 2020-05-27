@@ -8,7 +8,6 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Activation,Dropout
 from tensorflow.keras.callbacks   import EarlyStopping
 
-from imblearn.under_sampling import CondensedNearestNeighbour
 
 
 df1 = pd.read_csv('1.csv')
@@ -377,11 +376,3 @@ print(r2_score(y_test,y_predann))
 print(classification_report(y_test,y_predann))
    """
 #------------------------------------------------
-#xgboost and random forest performed well as expected for imbalanced
-#data. Lets try to balance it and then try again
-   
-#Performing CONDENSED NEAREST NEIGBOURING(CNN) undersampling technique
-undersample = CondensedNearestNeighbour(n_neighbors=1)
-#undersampling only the train set and not test set since doing on both
-# the model may perform well, but will do bad on new data which comesimbalanced
-X, y = undersample.fit_resample(X, y)
