@@ -8,6 +8,7 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Activation,Dropout
 from tensorflow.keras.callbacks   import EarlyStopping
 
+from imblearn.under_sampling import CondensedNearestNeighbour
 
 
 df1 = pd.read_csv('1.csv')
@@ -284,25 +285,8 @@ r2_score(y_test,y_predl) #46%
 report = classification_report(y_test,y_predl)
 # as expected logistic regression works bad on imbalanced data
 #-------------------------------------------------------------------------
-#--------------------------------------------------------------------------
-#3)SVM
-# Fitting SVM to the Training set
-from sklearn.svm import SVC
-svmclassifier = SVC(random_state = 0)
-svmclassifier.fit(X_train, y_train)
 
-# Predicting the Test set results
-y_predsvm = svmclassifier.predict(X_test)
-
-# Making the Confusion Matrix
-from sklearn.metrics import confusion_matrix
-cmsvm = confusion_matrix(y_test, y_predsvm)
-cmsvm
-r2_score(y_test,y_predsvm) # 62%
-report = classification_report(y_test,y_predsvm)
-#99
-#---------------------------------------------------------------------------
-#6)Random Forest
+#2)Random Forest
 # Fitting Random Forest Classification to the Training set
 from sklearn.ensemble import RandomForestClassifier
 rfclassifier = RandomForestClassifier(n_estimators = 10, criterion = 'entropy', random_state = 0)
@@ -376,3 +360,84 @@ print(r2_score(y_test,y_predann))
 print(classification_report(y_test,y_predann))
    """
 #------------------------------------------------
+#xgboost and random forest performed well as expected for imbalanced
+#data. Lets try to balance it and then try again
+""" TAKES LOT OF TIME
+#Performing CONDENSED NEAREST NEIGBOURING(CNN) undersampling technique
+undersample = CondensedNearestNeighbour(n_neighbors=1)
+#undersampling only the train set and not test set since doing on both
+# the model may perform well, but will do bad on new data which comesimbalanced
+X1_train, y1_train = undersample.fit_resample(X_train, y_train)
+"""
+# we need to resort to random under sub sampling
+X_train_df = pd.DataFrame(X_train)
+y_train_df = pd.DataFrame(y_train)
+
+fraudlen = len(y_train_df[y_train_df==1].dropna()) #5748 frauds in train set
+#fetching indices of frauds
+fraudindices = y_train_df==1
+fraudindices = fraudindices[fraudindices==1]
+fraudindices = fraudindices.dropna().index.values
+
+# fetching indices of genuine transactions
+genuineindices = y_train_df==0
+genuineindices = genuineindices[genuineindices]
+genuineindices = genuineindices.dropna().index.values
+
+#randomly select indices from majority class
+rand_genuineindex = np.random.choice(genuineindices, fraudlen, replace = False)
+#concatenate fraud and random genuine index to make final training df
+index = np.concatenate([fraudindices,rand_genuineindex])
+
+#sampling to be done only on train set
+X_train_balanced = X_train_df.iloc[index]
+y_train_balanced = y_train_df.iloc[index]
+
+sns.countplot(0,data=y_train_balanced) # balanced data
+
+#applying models now
+
+#1)LOGISTIC REGRESSION
+lclassifier.fit(X_train_balanced, y_train_balanced)
+#prediction to be done on imbalanced test set
+y_predl = lclassifier.predict(X_test)
+cmL = confusion_matrix(y_test, y_predl)
+cmL
+r2_score(y_test,y_predl) #46%
+report = classification_report(y_test,y_predl)
+# as expected logistic regression works bad on imbalanced data
+#-------------------------------------------------------------------------
+#2)Random Forest
+rfclassifier1 = RandomForestClassifier(n_estimators = 10, criterion = 'entropy', random_state = 0)
+rfclassifier1.fit(X_train_balanced, y_train_balanced)
+# Predicting the Test set results
+y_predrf = rfclassifier1.predict(X_test)
+rfcm = confusion_matrix(y_test, y_predrf)
+rfcm
+r2_score(y_test,y_predrf) 
+report = classification_report(y_test,y_predrf)
+# Recall increased as we wanted but precision dropped badly
+# changing the number of estimators
+rfclassifier2 = RandomForestClassifier(n_estimators = 50, criterion = 'entropy', random_state = 0)
+rfclassifier2.fit(X_train_balanced, y_train_balanced)
+y_predrf = rfclassifier2.predict(X_test)
+rfcm = confusion_matrix(y_test, y_predrf)
+rfcm
+r2_score(y_test,y_predrf) 
+report = classification_report(y_test,y_predrf)
+
+#------------------------------------------------------
+#3) implement xgboost
+xgbclassifier.fit(X_train_balanced.values, y_train_balanced.values)
+y_predxgb = xgbclassifier.predict(X_test)
+cmxgb = confusion_matrix(y_test, y_predxgb)
+cmxgb
+r2_score(y_test,y_predxgb) 
+report = classification_report(y_test,y_predxgb)
+#------------------------------------------------------------
+
+#After undersampling randomly, the model performed worse. Although it
+#managed to increase recall, precision and f1 score worsened. This is
+#highly possible because of 2 reasons:
+#A) We performed random sampling and couldnt do CNN undersampling due to memory issues
+#B) our test set is not balanced(since we want practical real life test set)), so it is expected model performs bad 
