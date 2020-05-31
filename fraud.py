@@ -10,27 +10,6 @@ from tensorflow.keras.callbacks   import EarlyStopping
 
 from imblearn.under_sampling import CondensedNearestNeighbour
 
-
-df1 = pd.read_csv('1.csv')
-len(df1[df1['isFraud']==1]) #535
-df2 = pd.read_csv('2.csv')#1501
-len(df2[df2['isFraud']==1])
-df3 = pd.read_csv('3.csv')
-len(df3[df3['isFraud']==1])#583
-df4 = pd.read_csv('4.csv')
-len(df4[df4['isFraud']==1]) #762
-df5 = pd.read_csv('5.csv')
-len(df5[df5['isFraud']==1]) #554
-df6 = pd.read_csv('6.csv')
-len(df6[df6['isFraud']==1]) #880
-df7 = pd.read_csv('7.csv')
-len(df7[df7['isFraud']==1]) #3398
-
-535+1501+583+762+554+880+3398 # 8213 fraud cases
-(8213/962627)*100 #0.8% of the total cases are fraud
-#df = pd.read_excel('fraudfivelakh.xlsx') #dataset import
-
-#df = pd.concat([df1,df2,df3,df4,df5,df6,df7],axis=0)
 df = pd.read_csv('frauddata.csv')
 df.columns
 df = df.rename(columns={'nameOrig':'senderid','oldbalanceOrg':'senderoldbal'
@@ -40,9 +19,8 @@ df = df.rename(columns={'nameOrig':'senderid','oldbalanceOrg':'senderoldbal'
 df.info()
 summary = df.describe()
 
-df.dtypes # 3 string values.Only type is categorical value
-df.isnull().sum() #No NaN values.Now checkn  for number of zeroes in columns
-(df==0).sum() 
+df.dtypes # 3 string values.Only 'type' is categorical value
+df.isnull().sum() #No NaN values.
 sns.countplot(x='type',data=df)
 #-----------------------------------------------------
 #VISUALIZATION to understand data columns
@@ -52,9 +30,9 @@ sns.lineplot(x='step',y='amount',data=df)
 
 #EDA------------------------------------------------------
 # 16 transfers where amount transacted was 0-> strange
-weird = df[df['amount']==0] # FRAUD
+zero_amount = df[df['amount']==0] # FRAUD
 
-sns.countplot(x='isFraud',data=df) #hihgly imbalanced data
+sns.countplot(x='isFraud',data=df) #highly imbalanced data
 len(df[df['isFraud']==1])
 #Total frauds=8213
 8213/(df.shape[0]) # 0.12% of cases are fraud
@@ -63,12 +41,15 @@ len(df[df['isFraud']==1])
 df[df['isFraud']==1].groupby(by='type')['type'].value_counts()
 # There are only 2 types of payment for all fraud cases- CASHOUT AND TRANSFER
 #4116 CASHOUTS AND 4097 TRANSFERS
+
 frauds = df[df.isFraud==1]
 sns.countplot(x='type',data=frauds)
 #For 4097 cases fraud is committed by first transferring out funds to
 # another account and subsequently cashing it out. 19 cases involve
 #direct cash out
+
 notfrauds = df[df.isFraud==0]
+
 # Checking if dest of transfers act as sender for cashouts which is
 #expected in a transfer first then cash out fraud
 fraudtransfer = frauds[frauds.type=='TRANSFER']
@@ -76,8 +57,7 @@ fraudcashout = frauds[frauds.type=='CASH_OUT']
 fraudtransfer.destid.isin (fraudcashout.senderid).any()
 # This is weird that dest of transfer is never a sender in cashout for frauds
 #no pattern here-> we can drop senderid and destid
-#------------------------------------------------------------------------
-# @@@IMTP--> We will remove SENDERID,RECEIVERID,FLAGGEDFRAUD from data
+
 #--------------------------------------------------------------------
 #eda on isflaggedfraud
 flaggedfraud = df[df.isFlaggedFraud==1] 
@@ -87,14 +67,16 @@ sns.countplot(x='isFlaggedFraud',data=df)
 #only transfer types
 # we need to see if there are any patterns for flagging fraud
 
-#is flagged fraud is said to be set when amt>200,000.We need to check this
+#is flagged fraud is said to be set according to kaggle's data description when amt>200,000.We need to check this
 print("The number of times when isFlaggedfraud is not set,\
       despite the amount being transacted was >200,000 = {}".format(
       len(df[(df.isFlaggedFraud==0) & (df.amount>200000)])))
-#This shows that isflaggedfraud is not right variable
+#This shows that isflaggedfraud is not a proper right variable
+
 print("Maxm amount transacted when isflagged was not set ={}".format(
         max(df[(df.isFlaggedFraud==0) & (df.amount>200000)]['amount'])))
 #92445516 not flagged fraud-> bad variable
+
 #Moreover sender and recipient's old and new balance remained same. This is
 # because maybe these transactions were halted by banks.WE shall check if
 #there are cases where old and new balance is same, yet not flagged as fraud
@@ -105,15 +87,17 @@ df[(df.isFlaggedFraud==0) & (df['type']=='TRANSFER') & (df['destoldbal']== 0) & 
 notflaggedfraud = df[df.isFlaggedFraud==0] 
 flaggedfraud['senderid'].isin (pd.concat([notflaggedfraud['senderid'],notflaggedfraud['destid']])).any()
 # False means no flagged fraud originator ever transacted. It was only one time he transacted
+
 flaggedfraud['destid'].isin (pd.concat([notflaggedfraud['senderid'],notflaggedfraud['destid']]))
 #True means a flagged recipient have transacted more than once
 #index 2736446 and index 3247297
+
 notflaggedfraud.iloc[2736446]
 notflaggedfraud.iloc[3247297] # This person has conducted a genuine
 #transaction as well-> impt data point
 
 #since there are 16 rows of isflagged and no definite pattern
-#cqn be found by our eda,we  will drop this column
+#can be found by our eda,we  will drop this column
 #--------------------------------------------------------------------
 #eda on MERCHANTS
 #NOW WE FIND INFO ABOUT rows containing sender or receiver name starting with
@@ -121,28 +105,35 @@ notflaggedfraud.iloc[3247297] # This person has conducted a genuine
 #and if they can be involved in any fraud
 merchants =df[df.senderid.str.contains('M')] 
 # merchants are never senders
+
 merchants =df[df.destid.str.contains('M')] 
 #merchants have always been recipients
+
 merchants['type'].nunique()
 merchants['type'].unique()
 # all the merchants have been involved in payment type
+
 merchants[merchants['isFraud']==1]
 # empty dataframe means merchants are not involved in any fraud
 # we can safely drop these merchant rows
 #--------------------------------------------------------------------------     
 #some other eda
+
 # check if there are cases where amount sent>senderoldbalance as this should not be possible
 df[df.amount>df.senderoldbal]
 ##4 million rows have been incorrectly calculated
+
 # check if there are cases where amount received>destnewdbalance as this should not be possible
 df[df.amount>df.destnewbal]
 # again 2.6 million incorrect calculations
+
 #checking occurences where amt>0 but destold and new balance are both 0
 df[(df['amount']>0) & (df['destoldbal']==0) &(df['destnewbal'] == 0) &
     (df['isFraud']==1)]
 4070/len(frauds)
 #50% of fraud transactions see old and new dest bal same. We cant impute
 #these values
+
 df[(df['amount']>0) & (df['destoldbal']==0) &(df['destnewbal'] == 0) &
     (df['isFraud']==0)]
 2313206 /len(notfrauds) # 36% rows
@@ -151,6 +142,7 @@ df[(df['amount']>0) & (df['destoldbal']==0) &(df['destnewbal'] == 0) &
 df[(df['amount']>0) & (df['senderoldbal']==0) &(df['sendernewbal'] == 0) &
     (df['isFraud']==1)]
 25/len(frauds) #0.3% cases
+
 df[(df['amount']>0) & (df['senderoldbal']==0) &(df['sendernewbal'] == 0) &
     (df['isFraud']==0)]
 2088944/len(notfrauds)
@@ -177,17 +169,11 @@ for i in range(0,len(frauds)):
     list.append(np.ceil(step/num_hours))
 frauds['day']=list
 
-frauds['dayofweek'] = frauds['day']%7  # result from 0->6 where 0 can be
+frauds['dayofweek'] = frauds['day']%7 
+ # result from 0->6 where 0 can be
 #any day. if 0 was monday, 1 would be tuesday but if 0 is tue , 1 is wed
 
 
-"""
-list=[]
-for i in range(0,len(notfrauds)):
-    step = notfrauds.iloc[i].step
-    list.append(np.ceil(step/num_hours))
-notfrauds['day']=list
-"""
 plt.hist(x='day',data=frauds)
 # no definite pattern based off the day
 plt.hist(x='hour',data=frauds)
@@ -195,31 +181,30 @@ plt.hist(x='hour',data=frauds)
 plt.hist(x='dayofweek',data=frauds)
 # no definite pattern based off dayofweek
 
-#------------------------------------------------------------
 #--------------------------------------------------------------
 #visualization
 sns.scatterplot(y='amount',x='step',data=df,hue='isFraud')
-
-
 
 #heatmap
 plt.figure(figsize=(8,5))
 sns.heatmap(df.corr(),annot=True)
 
 
-#------------------------------------------
+#-----------------------------------------------------------------
 #DATA PREPROCESSING
 df2 = df.copy()
+
 #since frauds are only for type=cashout or transfer acc to analysis
 X = df.loc[(df.type == 'TRANSFER') | (df.type == 'CASH_OUT')]
-#@@IMPT->SINCE TYPE=PAYMENT IS NOT INCLUDED ALL MERCHANTS HAVE
-#BEEN DROPPED
+#SINCE TYPE=PAYMENT IS NOT INCLUDED ALL MERCHANTS HAVE #BEEN DROPPED
+
 #Acc to analysis we dont consider flagged fraud for dependent variable
 y = X['isFraud']
 
 #DROP COLUMNS NOT NECESSARY
 X = X.drop(['senderid', 'destid', 'isFlaggedFraud'], axis = 1)
-X = X.drop('isFraud',axis=1) # remove dep variable from matrix of features
+X = X.drop('isFraud',axis=1)
+ # remove dep variable from matrix of features
 
 #check proportion of fraud data
 sns.countplot(y,data=y) #imbalanced data
@@ -256,7 +241,6 @@ X.dtypes #Type datatype is object
 X.loc[X.type == 'TRANSFER','type' ] = 0 #TRANSFER =0
 X.loc[X.type == 'CASH_OUT', 'type'] = 1  # CASHOUT =1
 X.dtypes #Type datatype is int
-#----------------------------------------------------------------------
 
 #----------------------------------------------------------------------    
 #TRAIN TEST SPLITTING
@@ -264,7 +248,6 @@ from sklearn.model_selection import train_test_split
 X_train,X_test,y_train,y_test= train_test_split(X,y,test_size=0.3,random_state=0)
 
 # Feature Scaling
-# IMPT- REQUIRED FOR SVM ELSE THAT TECHNIQUE WONT WORK
 from sklearn.preprocessing import StandardScaler
 sc = StandardScaler()
 X_train = sc.fit_transform(X_train)
@@ -291,9 +274,7 @@ report = classification_report(y_test,y_predl)
 from sklearn.ensemble import RandomForestClassifier
 rfclassifier = RandomForestClassifier(n_estimators = 10, criterion = 'entropy', random_state = 0)
 rfclassifier.fit(X_train, y_train)
-# Predicting the Test set results
 y_predrf = rfclassifier.predict(X_test)
-# Making the Confusion Matrix
 rfcm = confusion_matrix(y_test, y_predrf)
 rfcm
 r2_score(y_test,y_predrf) # 81%
@@ -307,8 +288,7 @@ rfcm = confusion_matrix(y_test, y_predrf)
 rfcm
 r2_score(y_test,y_predrf) # 82%
 report = classification_report(y_test,y_predrf)
-
-"""Feature importance"""
+#precision as well as recall both are good
 
 #------------------------------------------------------
 #implement xgbosot
@@ -319,16 +299,18 @@ y_predxgb = xgbclassifier.predict(X_test)
 cmxgb = confusion_matrix(y_test, y_predxgb)
 cmxgb
 r2_score(y_test,y_predxgb) # 87%
-report = classification_report(y_test,y_predxgb)
+reportxgb = classification_report(y_test,y_predxgb)
 #--------------------------------------------------------
 #ANN
 #converting dep variable in array for neural nets
+
 y_train = y_train.values
 y_test = y_test.values
 
 model = Sequential()
-model.add(Dense(units=10,activation='relu'))
-#hidden layer
+#1st hidden layer
+model.add(Dense(units=5,input_dim=10,activation='relu'))
+
 model.add(Dense(units=30,activation='relu'))
 model.add(Dropout(0.2))
 
@@ -338,27 +320,70 @@ model.add(Dropout(0.2))
 model.add(Dense(units=1,activation='sigmoid'))
 
 # For a binary classification problem
-model.compile(loss='binary_crossentropy', optimizer='adam')
+model.compile(loss='binary_crossentropy', optimizer='adam',metrics=['accuracy'])
 early_stop = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=10)
 
 model.fit(x=X_train, 
           y=y_train, 
           epochs=25,
-          batch_size=256,
+          
           validation_data=(X_test, y_test),
           callbacks=[early_stop] 
           )
-losses = pd.DataFrame(model.history.history)
 
-losses.plot()
-y_predann = model.predict(X_test)
-"""
 #scale back y_predann
-sc.scale_
-print(confusion_matrix(y_test,y_predann))
-print(r2_score(y_test,y_predann))
-print(classification_report(y_test,y_predann))
-   """
+print(r2_score(y_test,y_predann)) #71%
+# Mediocre performance
+#-------------------------------------------------------
+#evaluating kfold and rforest by stratified k fold cross validation
+
+accuracyrf=[]
+accuracyxgb=[]
+#empty list to store accuracies of all folds
+
+from sklearn.model_selection import StratifiedKFold
+skf = StratifiedKFold(n_splits=5)
+skf.get_n_splits(X,y)
+for train_index, test_index in skf.split(X, y):
+  print("TRAIN:", train_index, "TEST:", test_index)
+  X_train_strat, X_test_strat = X.iloc[train_index], X.iloc[test_index]
+  y_train_strat, y_test_strat = y.iloc[train_index], y.iloc[test_index]
+
+  from sklearn.metrics import accuracy_score
+  #evaluating rf classifier on 10 folds
+  rfclassifier.fit(X_train_strat,y_train_strat)
+  y_predrfstrat = rfclassifier.predict(X_test_strat)
+  score = accuracy_score(y_test_strat,y_predrfstrat)
+  accuracyrf.append(score)
+np.array(accuracyrf).mean()
+# Drop in accuracy for last fold. It means that the model must have started overfitting at some point
+
+"""Feature importance"""
+importance = rfclassifier.feature_importances_
+feature_importance = pd.DataFrame(importance,columns=['importance'])
+feature_importance = feature_importance.sort_values(by=['importance'],ascending=False)
+colname=[]
+for i in feature_importance.index:
+    colname.append(X_train_strat.columns[i])
+feature_importance['colname']=colname
+#step variable has maxm contribution towards results
+
+#evaluating xgboost classifier on 5 folds
+from sklearn.model_selection import StratifiedKFold
+skf = StratifiedKFold(n_splits=5)
+skf.get_n_splits(X,y)
+for train_index, test_index in skf.split(X, y):
+  print("TRAIN:", train_index, "TEST:", test_index)
+  X_train_strat, X_test_strat = X.iloc[train_index], X.iloc[test_index]
+  y_train_strat, y_test_strat = y.iloc[train_index], y.iloc[test_index]
+  xgbclassifier.fit(X_train_strat,y_train_strat)
+  y_predxgbstrat = xgbclassifier.predict(X_test_strat)
+  score = accuracy_score(y_test_strat,y_predxgbstrat)
+  accuracyxgb.append(score)
+np.array(accuracyxgb).mean()
+#97% accuracy after all the folds-> really good accuracy, No overfitting
+
+
 #------------------------------------------------
 #xgboost and random forest performed well as expected for imbalanced
 #data. Lets try to balance it and then try again
@@ -405,18 +430,17 @@ cmL = confusion_matrix(y_test, y_predl)
 cmL
 r2_score(y_test,y_predl) #46%
 report = classification_report(y_test,y_predl)
-# as expected logistic regression works bad on imbalanced data
 #-------------------------------------------------------------------------
 #2)Random Forest
 rfclassifier1 = RandomForestClassifier(n_estimators = 10, criterion = 'entropy', random_state = 0)
 rfclassifier1.fit(X_train_balanced, y_train_balanced)
-# Predicting the Test set results
 y_predrf = rfclassifier1.predict(X_test)
 rfcm = confusion_matrix(y_test, y_predrf)
 rfcm
 r2_score(y_test,y_predrf) 
 report = classification_report(y_test,y_predrf)
 # Recall increased as we wanted but precision dropped badly
+
 # changing the number of estimators
 rfclassifier2 = RandomForestClassifier(n_estimators = 50, criterion = 'entropy', random_state = 0)
 rfclassifier2.fit(X_train_balanced, y_train_balanced)
@@ -425,7 +449,7 @@ rfcm = confusion_matrix(y_test, y_predrf)
 rfcm
 r2_score(y_test,y_predrf) 
 report = classification_report(y_test,y_predrf)
-
+#No improvement
 #------------------------------------------------------
 #3) implement xgboost
 xgbclassifier.fit(X_train_balanced.values, y_train_balanced.values)
@@ -434,10 +458,14 @@ cmxgb = confusion_matrix(y_test, y_predxgb)
 cmxgb
 r2_score(y_test,y_predxgb) 
 report = classification_report(y_test,y_predxgb)
+#no improvement
 #------------------------------------------------------------
 
 #After undersampling randomly, the model performed worse. Although it
 #managed to increase recall, precision and f1 score worsened. This is
 #highly possible because of 2 reasons:
-#A) We performed random sampling and couldnt do CNN undersampling due to memory issues
+#A) We performed random sampling and couldnt do CNN undersampling as it takes lot of time in transforming such huge data
 #B) our test set is not balanced(since we want practical real life test set)), so it is expected model performs bad 
+
+# Results- The best performance was given for imbalanced dataset by XGBoost model. Although random forest gave similar
+# r2 score on imbalanced data(little less), but the model stability was much greaeter in xgboost and hence is expected to work better on new data
