@@ -29,6 +29,7 @@ The model is built in an Anaconda Environment and Python 3.5.0. All the librarie
 - Open a Python editor like Spyder or Jupyter notebook
 	* You may create and use a virtual environment to work on this project
 - Set the working directory to the folder where you extracted the files
+- Download the dataset from the link given in Data Collection above, name it as 'frauddata.csv'  and save it in the working directory
 - Run fraud.py
 
 
